@@ -496,3 +496,161 @@ db.notifications.deleteOne({
 This removes a notification document from the database based on its identifier.
 
 ---
+
+# Stage 3
+
+## Query Evaluation
+
+### Existing Query
+
+```sql
+SELECT *
+FROM notifications
+WHERE student_id = 1042
+AND is_read = FALSE
+ORDER BY created_at ASC;
+```
+
+### Is the Query Correct?
+
+From a functional perspective, the query is valid. It retrieves every unread notification associated with the student whose ID is **1042** and arranges the results in ascending order based on their creation timestamp.
+
+Although the logic is correct, the query may not perform efficiently once the notification table reaches millions of records.
+
+---
+
+# Factors Affecting Performance
+
+## 1. Retrieving All Columns
+
+The use of `SELECT *` instructs the database to return every column in each matching row.
+
+In many applications, only a limited set of fields—such as the notification title, message, category, and creation time—are displayed to the user. Returning unnecessary columns increases disk I/O, network traffic, and memory consumption.
+
+---
+
+## 2. Absence of Proper Indexes
+
+When the filtering columns are not indexed, the database engine must examine every row in the table before identifying the matching notifications.
+
+With millions of stored notifications, this sequential scan significantly increases query execution time.
+
+---
+
+## 3. Sorting Overhead
+
+After filtering the records, the database orders the results using the `created_at` column.
+
+If the sorting column is not included in an index, the database performs an additional sorting step, which further impacts performance, especially for large result sets.
+
+---
+
+# Improved Query
+
+Instead of requesting every attribute from the table, it is more efficient to retrieve only the information required by the application.
+
+```sql
+SELECT
+    id,
+    title,
+    message,
+    type,
+    created_at
+FROM notifications
+WHERE student_id = 1042
+AND is_read = FALSE
+ORDER BY created_at ASC;
+```
+
+By reducing the amount of data returned, the database spends less time reading, transmitting, and processing records.
+
+---
+
+# Suggested Index
+
+A composite index that follows the filtering and sorting pattern of the query provides the best improvement.
+
+```sql
+CREATE INDEX idx_notifications_student_read_created
+ON notifications(student_id, is_read, created_at);
+```
+
+This index enables the database to:
+
+* Locate notifications belonging to a specific student.
+* Filter unread records without scanning the entire table.
+* Return the records in chronological order directly from the index.
+
+As a result, both lookup time and sorting overhead are greatly reduced.
+
+---
+
+# Time Complexity
+
+## Without an Index
+
+Without suitable indexing, the database performs a full table scan.
+
+* Searching: **O(n)**
+* Sorting: **O(n log n)**
+
+As the notification table continues to grow, response times become increasingly slower.
+
+---
+
+## With the Composite Index
+
+Using the recommended index allows the database to navigate directly to the required records.
+
+* Index Lookup: **O(log n)**
+* Fetch Matching Records: proportional to the number of results
+
+Since the index maintains the required ordering, the database usually avoids performing a separate sort operation.
+
+---
+
+# Is Indexing Every Column a Good Strategy?
+
+No.
+
+While indexes accelerate read operations, creating one on every column is generally considered poor database design.
+
+Excessive indexing introduces several disadvantages:
+
+* Additional storage space is required for each index.
+* INSERT, UPDATE, and DELETE operations become slower because every index must also be updated.
+* The database optimizer may ignore many unused indexes.
+* Database maintenance and backup operations become more expensive.
+
+A better strategy is to index only the columns that are commonly used for filtering, joining, sorting, or searching.
+
+---
+
+# SQL Query
+
+Retrieve the IDs of students who received **Placement** notifications within the previous seven days.
+
+```sql
+SELECT DISTINCT student_id
+FROM notifications
+WHERE type = 'Placement'
+AND created_at >= NOW() - INTERVAL 7 DAY;
+```
+
+---
+
+# Index for the Above Query
+
+To improve the execution of this query, the following composite index is recommended.
+
+```sql
+CREATE INDEX idx_notifications_type_created
+ON notifications(type, created_at);
+```
+
+This index allows the database to efficiently locate notifications of the **Placement** category and restrict the search to recently created records.
+
+---
+
+# Summary
+
