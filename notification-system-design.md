@@ -732,3 +732,65 @@ Using both technologies together provides several advantages:
 
 ---
 
+# Stage 5
+
+## Asynchronous Notification Processing
+
+To make the notification system more scalable and fault tolerant, I would introduce a message broker such as **RabbitMQ** between the API and the notification delivery service.
+
+Rather than sending notifications directly after an API request, the application stores the notification in the database and publishes a message to RabbitMQ. Dedicated worker processes consume messages from the queue and handle notification delivery independently of the API.
+
+---
+
+# Processing Flow
+
+The notification lifecycle follows these steps:
+
+1. Store the notification in the MySQL database.
+2. Publish a notification message to RabbitMQ.
+3. A background worker retrieves the message from the queue.
+4. The worker sends the notification to the intended user through Socket.IO.
+5. If delivery is unsuccessful, the worker retries the operation a predefined number of times.
+6. Messages that continue to fail are transferred to a **Dead Letter Queue (DLQ)** for further inspection or manual processing.
+
+Separating notification delivery from the API allows client requests to complete without waiting for the notification to be sent.
+
+---
+
+# Advantages
+
+Using a message queue provides several architectural benefits:
+
+* API requests finish quickly because notification delivery occurs asynchronously.
+* Worker processes can be scaled independently as notification traffic increases.
+* Retry mechanisms improve the reliability of message delivery.
+* Failed notifications are isolated in a Dead Letter Queue instead of being lost.
+* The queue smooths out sudden spikes in traffic, preventing the backend from becoming overloaded.
+
+---
+
+# System Architecture
+
+```id="fhmwyb"
+Client
+   │
+   ▼
+Notification API
+   │
+   ▼
+MySQL Database
+   │
+   ▼
+RabbitMQ Exchange / Queue
+   │
+   ▼
+Background Worker
+   │
+   ▼
+Socket.IO Server
+   │
+   ▼
+Connected Users
+```
+
+---
