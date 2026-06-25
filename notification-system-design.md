@@ -1,6 +1,6 @@
 # Notification System API Design
 
-## Phase 1
+## Stage 1
 
 ### Introduction
 
@@ -294,3 +294,205 @@ new-notification
 * Each notification is uniquely identified using a UUID.
 * Date and time values follow the ISO 8601 standard.
 * API responses maintain a consistent structure to simplify client-side integration.
+
+# Stage 2
+
+## Database Selection
+
+For the notification platform, **MongoDB** is the preferred database for storing notification data.
+
+### Why Choose MongoDB?
+
+MongoDB is well suited for applications that handle a high volume of notification records because it offers:
+
+* A document-based storage model using BSON (JSON-like documents).
+* Fast write operations, making it suitable for systems that generate notifications frequently.
+* Horizontal scaling through sharding to support future growth.
+* A flexible schema, allowing additional fields to be introduced without modifying existing documents.
+* Seamless integration with Node.js applications through the Mongoose ODM.
+
+---
+
+# Database Collections
+
+## students
+
+```json id="t7q2am"
+{
+  "_id": ObjectId,
+  "name": "PEDADA SAI KRISHNA",
+  "email": "23pa1a4287@vishnu.edu.in",
+  "createdAt": ISODate("2026-04-22T17:51:18Z")
+}
+```
+
+---
+
+## notifications
+
+```
+{
+  "_id": ObjectId,
+  "studentId": ObjectId,
+  "type": "Placement",
+  "title": "Placement Drive",
+  "message": "Microsoft is hiring",
+  "isRead": false,
+  "createdAt": ISODate("2026-04-22T17:51:18Z")
+}
+```
+
+---
+
+# Data Relationship
+
+Each student can have multiple notifications associated with their account.
+
+```
+Student
+   │
+   ├── Notification
+   ├── Notification
+   └── Notification
+```
+
+The connection between the two collections is established using the `studentId` field stored in every notification document.
+
+---
+
+# Index Strategy
+
+To improve query performance, the following indexes should be created.
+
+```javascript id="zgc4lj"
+db.notifications.createIndex({ studentId: 1 })
+
+db.notifications.createIndex({ studentId: 1, isRead: 1 })
+
+db.notifications.createIndex({ type: 1 })
+
+db.notifications.createIndex({ createdAt: -1 })
+```
+
+These indexes help reduce query execution time by allowing MongoDB to locate matching documents without scanning the entire collection.
+
+---
+
+# Challenges with Large Datasets
+
+As the notification database expands, several performance issues may appear:
+
+* Queries become slower when appropriate indexes are unavailable.
+* Loading a large number of notifications increases memory consumption.
+* Sorting records by creation time requires additional processing.
+* Query latency grows as the collection size increases.
+
+---
+
+# Performance Improvements
+
+The following techniques help maintain good performance as the application scales:
+
+* Create indexes on fields that are frequently searched or filtered.
+* Implement pagination using `skip()` and `limit()` to avoid loading excessive data.
+* Return only the required fields through projections.
+* Move historical notifications to an archive collection.
+* Distribute data across multiple shards when notification volume becomes very large.
+* Cache frequently requested notifications using Redis to reduce database load.
+
+---
+
+# MongoDB Operations
+
+## Retrieve Notifications
+
+```javascript id="jwxlqe"
+db.notifications
+.find({ studentId: ObjectId(studentId) })
+.sort({ createdAt: -1 })
+.skip(0)
+.limit(10)
+```
+
+This query returns a paginated list of notifications for a specific student, ordered from the newest to the oldest.
+
+---
+
+## Retrieve a Single Notification
+
+```javascript id="f8zjj2"
+db.notifications.findOne({
+    _id: ObjectId(notificationId)
+})
+```
+
+This operation retrieves a notification using its unique identifier.
+
+---
+
+## Insert a New Notification
+
+```javascript id="v87go3"
+db.notifications.insertOne({
+    studentId: ObjectId(studentId),
+    type: "Placement",
+    title: "Placement Drive",
+    message: "Microsoft is hiring",
+    isRead: false,
+    createdAt: new Date()
+})
+```
+
+A new notification document is added to the collection with the current timestamp.
+
+---
+
+## Mark One Notification as Read
+
+```javascript
+db.notifications.updateOne(
+    {
+        _id: ObjectId(notificationId)
+    },
+    {
+        $set: {
+            isRead: true
+        }
+    }
+)
+```
+
+This updates the read status of a single notification.
+
+---
+
+## Mark All Notifications as Read
+
+```javascript 
+db.notifications.updateMany(
+    {
+        studentId: ObjectId(studentId)
+    },
+    {
+        $set: {
+            isRead: true
+        }
+    }
+)
+```
+
+Every notification associated with the specified student is updated to indicate that it has been read.
+
+---
+
+## Delete a Notification
+
+```javascript 
+db.notifications.deleteOne({
+    _id: ObjectId(notificationId)
+})
+```
+
+This removes a notification document from the database based on its identifier.
+
+---
