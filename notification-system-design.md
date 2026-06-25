@@ -793,132 +793,50 @@ Socket.IO Server
 Connected Users
 ```
 
----
-
 # Stage 6
 
 ## Priority-Based Notification Display
 
-To ensure users see the most important updates first, notifications should be organized according to their business priority rather than relying only on their creation time. This approach highlights critical announcements while still maintaining a logical ordering.
+To make the notification dashboard more useful, notifications should be ordered according to their importance rather than relying only on their creation time. This ensures that high-priority updates are immediately visible to students.
 
 ---
 
 # Priority Levels
 
-The notification categories are ranked as follows:
+The notifications are displayed in the following order:
 
-1. Placement
-2. Result
-3. Event
+1. **Placement**
+2. **Result**
+3. **Event**
 
-Notifications with a higher priority are displayed before lower-priority ones.
+Notifications belonging to a higher priority category appear before lower priority categories.
 
 ---
 
 # SQL Query
 
-```sql id="vpjlwm"
+```sql
 SELECT *
 FROM notifications
 WHERE student_id = ?
 ORDER BY
-CASE
-    WHEN type = 'Placement' THEN 1
-    WHEN type = 'Result' THEN 2
-    WHEN type = 'Event' THEN 3
-END,
-created_at DESC;
+    CASE
+        WHEN type = 'Placement' THEN 1
+        WHEN type = 'Result' THEN 2
+        WHEN type = 'Event' THEN 3
+    END,
+    created_at DESC;
 ```
-
-The `CASE` expression assigns a ranking value to each notification type. After sorting by priority, notifications belonging to the same category are arranged from the most recent to the oldest using the `created_at` column.
 
 ---
 
 # Benefits of Priority Sorting
 
-Implementing priority-based ordering offers several advantages:
+This ordering strategy offers several advantages:
 
-* Critical notifications are displayed before general announcements.
-* Placement opportunities remain highly visible and are less likely to be overlooked.
-* Recent notifications within each category appear first, making the inbox easier to navigate.
-* Users can quickly identify time-sensitive information without manually filtering notifications.
-
----
-
-# Notification Ranking Logic
-
-The following Node.js implementation retrieves notifications from the API and sorts them according to the defined priority levels. If two notifications have the same priority, the newer notification is displayed first.
-
-```javascript id="bmdwji"
-const axios = require("axios");
-
-require("dotenv").config();
-
-// Priority Weight
-const priority = {
-  Placement: 3,
-  Result: 2,
-  Event: 1,
-};
-
-async function getTopNotifications(limit = 10) {
-  try {
-    const response = await axios.get(process.env.API_URL, {
-      headers: {
-        Authorization: `Bearer ${process.env.ACCESS_TOKEN}`,
-      },
-    });
-
-    const notifications = response.data.notifications;
-
-    if (!notifications) {
-      throw new Error(
-        `Unexpected API response: ${JSON.stringify(response.data)}`,
-      );
-    }
-
-    // Sort by Priority first, then Latest Timestamp
-    notifications.sort((a, b) => {
-      const priorityDiff = priority[b.Type] - priority[a.Type];
-
-      if (priorityDiff !== 0) {
-        return priorityDiff;
-      }
-
-      return new Date(b.Timestamp) - new Date(a.Timestamp);
-    });
-
-    return notifications.slice(0, limit);
-  } catch (error) {
-    console.error(
-      "Error fetching notifications:",
-      error.response?.data || error.message,
-    );
-    return [];
-  }
-}
-
-(async () => {
-  const topNotifications = await getTopNotifications();
-
-  console.log("\nTop Priority Notifications\n");
-
-  if (topNotifications.length === 0) {
-    console.log(
-      "No notifications available. Check your ACCESS_TOKEN in .env file.",
-    );
-    return;
-  }
-
-  console.table(
-    topNotifications.map((notification) => ({
-      ID: notification.ID,
-      Type: notification.Type,
-      Message: notification.Message,
-      Timestamp: notification.Timestamp,
-    })),
-  );
-})();
-```
+* Placement-related notifications are always displayed at the top of the inbox.
+* Important academic updates, such as examination results, are prioritized over general announcements.
+* Notifications within the same category are arranged from newest to oldest, making recent updates easier to find.
+* Students can quickly identify critical information without manually searching through all notifications.
 
 ---
