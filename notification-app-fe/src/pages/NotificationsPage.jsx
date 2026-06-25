@@ -1,11 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Alert,
   Badge,
   Box,
   CircularProgress,
-  Divider,
-  Pagination,
+    Pagination,
   Stack,
   Typography,
 } from "@mui/material";
@@ -14,73 +13,192 @@ import NotificationsIcon from "@mui/icons-material/Notifications";
 import { NotificationCard } from "../components/NotificationCard";
 import { NotificationFilter } from "../components/NotificationFilter";
 import { useNotifications } from "../hooks/useNotifications";
+import Log from "../lib/logger";
 
 export function NotificationsPage() {
-  const [filter, setFilter] = useState();
-  const [page, setPage] = useState("1");
+  const [filter, setFilter] = useState("All");
+  const [page, setPage] = useState(1);
 
-  const { notifications, totalPages, loading, error } = useNotifications();
+  const {
+    notifications,
+    totalPages,
+    loading,
+    error,
+    unreadCount,
+    viewedIds,
+    markAsViewed,
+  } = useNotifications({ filter, page });
 
-  const unreadCount = 2;
+  // log page load once
+  useEffect(() => {
+    Log("backend", "info", "page", "Notifications page loaded");
+  }, []);
 
-  const handleFilterChange = (newFilter) => {
+  function handleFilterChange(newFilter) {
+    Log("backend", "info", "page", `Filter changed: ${newFilter}`);
+    setFilter(newFilter);
+    setPage(1); // reset to first page on filter change
+  }
 
-  };
-
-  const handlePageChange = (_, newPage) => {
-
-  };
+  function handlePageChange(_, newPage) {
+    // guard invalid page numbers
+    if (newPage < 1 || newPage > totalPages) return;
+    Log("backend", "info", "page", `Pagination changed: page ${newPage}`);
+    setPage(newPage);
+  }
 
   return (
-    <Box sx={{ maxWidth: 720, mx: "auto", px: 2, py: 4 }}>
-      <Stack direction="row" alignItems="center" spacing={1.5} mb={3}>
-        <Badge badgeContent={unreadCount} color="primary" max={99}>
-          <NotificationsIcon sx={{ fontSize: 28 }} />
-        </Badge>
-        <Typography variant="h5" fontWeight={700}>
-          Notifications
-        </Typography>
-      </Stack>
+    <Box
+      sx={{
+        minHeight: "100vh",
+        background:
+          "linear-gradient(135deg,#eef2ff 0%,#f8fafc 50%,#ffffff 100%)",
+        py: 5,
+        px: 2,
+      }}
+    >
+      <Box
+        sx={{
+          maxWidth: 900,
+          mx: "auto",
+        }}
+      >
+        {/* Header */}
+        <Box
+          sx={{
+            p: 4,
+            borderRadius: 4,
+            background: "linear-gradient(135deg,#2563eb,#4f46e5)",
+            color: "white",
+            boxShadow: "0 20px 40px rgba(37,99,235,.25)",
+            mb: 4,
+          }}
+        >
+          <Stack
+            direction="row"
+            justifyContent="space-between"
+            alignItems="center"
+          >
+            <Stack direction="row" spacing={2} alignItems="center">
+              <Badge badgeContent={unreadCount} color="error">
+                <NotificationsIcon sx={{ fontSize: 36 }} />
+              </Badge>
 
-      <Divider sx={{ mb: 3 }} />
+              <Box>
+                <Typography variant="h4" fontWeight="bold">
+                  Notifications
+                </Typography>
 
-      <Box sx={{ marginBottom: 3 }}>
-        <NotificationFilter value={filter} onChange={handleFilterChange} />
+                <Typography sx={{ opacity: 0.85 }}>
+                  Stay updated with your latest activity
+                </Typography>
+              </Box>
+            </Stack>
+
+            <Box
+              sx={{
+                px: 3,
+                py: 1,
+                bgcolor: "rgba(255,255,255,.15)",
+                borderRadius: 3,
+              }}
+            >
+              <Typography variant="h6">{unreadCount}</Typography>
+
+              <Typography variant="body2">Unread</Typography>
+            </Box>
+          </Stack>
+        </Box>
+
+        {/* Filter */}
+        <Box
+          sx={{
+            bgcolor: "white",
+            p: 2,
+            borderRadius: 3,
+            boxShadow: "0 8px 25px rgba(0,0,0,.08)",
+            mb: 3,
+          }}
+        >
+          <NotificationFilter value={filter} onChange={handleFilterChange} />
+        </Box>
+
+        {/* Loading */}
+        {loading && (
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "center",
+              py: 10,
+            }}
+          >
+            <CircularProgress size={45} />
+          </Box>
+        )}
+
+        {/* Error */}
+        {!loading && error && (
+          <Alert severity="error" sx={{ borderRadius: 3 }}>
+            Failed to load notifications
+          </Alert>
+        )}
+
+        {/* Empty */}
+        {!loading && !error && notifications.length === 0 && (
+          <Alert severity="info" sx={{ borderRadius: 3 }}>
+            No notifications available.
+          </Alert>
+        )}
+
+        {/* Cards */}
+        {!loading && !error && notifications.length > 0 && (
+          <Stack spacing={2}>
+            {notifications.map((n) => (
+              <Box
+                key={n.ID}
+                sx={{
+                  borderRadius: 3,
+                  overflow: "hidden",
+                  bgcolor: "white",
+                  boxShadow: "0 8px 30px rgba(0,0,0,.08)",
+                  transition: ".3s",
+
+                  "&:hover": {
+                    transform: "translateY(-4px)",
+                    boxShadow: "0 15px 40px rgba(0,0,0,.12)",
+                  },
+                }}
+              >
+                <NotificationCard
+                  notification={n}
+                  viewed={viewedIds.has(n.ID)}
+                  onView={() => markAsViewed(n.ID)}
+                />
+              </Box>
+            ))}
+          </Stack>
+        )}
+
+        {/* Pagination */}
+        {!loading && totalPages > 1 && (
+          <Box
+            sx={{
+              mt: 5,
+              display: "flex",
+              justifyContent: "center",
+            }}
+          >
+            <Pagination
+              page={page}
+              count={totalPages}
+              onChange={handlePageChange}
+              shape="rounded"
+              color="primary"
+              size="large"
+            />
+          </Box>
+        )}
       </Box>
-
-      {true && (
-        <Box display="flex" justifyContent="center" py={6}>
-          <CircularProgress />
-        </Box>
-      )}
-
-      {!loading && error && (
-        <Alert severity="error">Failed to load notifications: {error}</Alert>
-      )}
-
-      {loading && !error && notifications.length == "0" && (
-        <Alert severity="info">Something message</Alert>
-      )}
-
-      {loading && !error && notifications.length > 0 && (
-        <Stack spacing={1.5}>
-          {notifications.map((n) => (
-            <></>
-          ))}
-        </Stack>
-      )}
-
-      {!loading && (
-        <Box display="flex" justifyContent="center" mt={4}>
-          <Pagination
-            count={totalPages}
-            page={page}
-            onChange={handlePageChange}
-            color="primary"
-            shape="rounded"
-          />
-        </Box>
-      )}
     </Box>
   );
 }
