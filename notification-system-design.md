@@ -652,5 +652,83 @@ This index allows the database to efficiently locate notifications of the **Plac
 
 ---
 
-# Summary
+# Stage 4
+
+## Performance Enhancement Strategy
+
+As the notification platform expands to support more users and a larger volume of notifications, relying solely on the database for every request can increase response time and place unnecessary pressure on the backend. To address these challenges, I would introduce **Redis** as a caching layer and **Socket.IO** to enable instant notification delivery.
+
+---
+
+# Is Caching Necessary?
+
+Yes.
+
+Caching is an effective way to improve application performance by temporarily storing frequently requested data in memory. Instead of repeatedly querying the database, the application can retrieve cached data from Redis, which is significantly faster.
+
+Redis is well suited for this purpose because it is an in-memory key-value store designed to deliver high-speed read and write operations with minimal latency.
+
+---
+
+# Cache Retrieval Process
+
+The notification retrieval process follows these steps:
+
+1. A user requests their notification list.
+2. The application checks whether the data exists in Redis.
+3. If the requested data is available (**Cache Hit**), Redis immediately returns the notifications.
+4. If the data is not found (**Cache Miss**), the application queries the MySQL database.
+5. The retrieved notifications are stored in Redis before being sent back to the client.
+
+By serving repeated requests from memory, the system minimizes database access and improves response times.
+
+---
+
+# Maintaining Cache Consistency
+
+Cached data must remain synchronized with the database.
+
+Whenever a notification is created, modified, marked as read, or removed, the corresponding cached data should either be refreshed or deleted.
+
+A common cache invalidation strategy is:
+
+1. Apply the required changes in MySQL.
+2. Remove the affected user's cached notifications from Redis.
+3. On the next request, retrieve the latest data from MySQL and repopulate the cache.
+
+This approach ensures that users always receive the most recent notification data.
+
+---
+
+# Instant Notification Delivery
+
+To provide real-time updates without requiring users to refresh the application, I would integrate **Socket.IO**, which uses WebSocket communication.
+
+### Workflow
+
+1. The user signs in to the application.
+2. The client establishes a persistent Socket.IO connection with the backend.
+3. When a new notification is generated, it is first stored in MySQL.
+4. Any existing Redis cache for that user is invalidated.
+5. The server broadcasts a `new-notification` event through Socket.IO.
+6. The connected client receives the notification immediately and updates the user interface in real time.
+
+---
+
+# Advantages of Combining Redis and Socket.IO
+
+Although Redis and Socket.IO are often used together, they serve different purposes within the system architecture.
+
+* Redis reduces the number of database queries by serving frequently requested data from memory.
+* Socket.IO maintains a persistent connection between the server and client, allowing notifications to be pushed instantly.
+
+Using both technologies together provides several advantages:
+
+* Lower response latency
+* Reduced database workload
+* Improved scalability under heavy traffic
+* Real-time updates without page refreshes
+* Better overall user experience
+
+---
 
